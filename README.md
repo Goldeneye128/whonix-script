@@ -33,6 +33,10 @@ To build Whonix, invoke the script with the version tag of Whonix you wish to bu
 $ whonix 17.1.1.8-developers-only
 ```
 
+Upon successful completion of the script, the resulting `.tar.gz` archives for both the Whonix Workstation and Gateway will be located within a directory named `whonix-binary` in your home directory. This directory will also contain the build log for your reference.
+
+To transfer the `whonix-binary` folder to your Mac, the `scp` command can be utilized. Once moved, you can extract the contents of both the Workstation and Gateway `.tar.gz` files using the command `tar -xvf` to obtain the UTM-compatible files. Following extraction, these files can be run in UTM to initiate your Whonix instances.
+
 ### Questions and Issues
 
 If you have any questions or encounter any issues, please feel free to contact me directly or open an issue on this repository. Your feedback and contributions are welcome, whether they are bug reports or feature requests.
