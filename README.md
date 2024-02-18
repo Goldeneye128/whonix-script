@@ -14,7 +14,10 @@ This script simplifies the process of building Whonix on Mac computers with Appl
 
 The script can be integrated into your system in several ways:
 - Execute it directly whenever needed.
-- Add the script to your `.bashrc` file for automatic initialization.
+- Add the script to your `.bashrc` file for automatic initialization. You can do this by adding a alias to your bashrc like this:
+```
+alias whonix="/bin/bash $HOME/.config/whonix-script/whonix"
+```
 - Place the script in `/usr/bin` for system-wide accessibility.
 
 Please ensure you read and understand the script before running it to familiarize yourself with its functions and operations.
