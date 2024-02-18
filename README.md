@@ -19,6 +19,9 @@ The script can be integrated into your system in several ways:
 alias whonix="/bin/bash $HOME/.config/whonix-script/whonix"
 ```
 - Place the script in `/usr/bin` for system-wide accessibility.
+```
+$ sudo cp whonix /bin/bash
+```
 
 Please ensure you read and understand the script before running it to familiarize yourself with its functions and operations.
 
