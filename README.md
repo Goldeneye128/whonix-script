@@ -20,7 +20,7 @@ alias whonix="/bin/bash $HOME/.config/whonix-script/whonix"
 ```
 - Place the script in `/usr/bin` for system-wide accessibility.
 ```
-$ sudo cp whonix /bin/bash
+$ sudo cp whonix /usr/bin/
 ```
 
 Please ensure you read and understand the script before running it to familiarize yourself with its functions and operations.
