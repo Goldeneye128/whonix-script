@@ -16,9 +16,10 @@ NAME="whonix"
 DM="derivative-maker"
 DB="derivative-binary"
 WB="whonix-binary"
+BL="build-log"
 VERSION="$1"
-VERSION_NUMBER="${WHONIX_VERSION%%-*}"
-REPOSITORY="https://github.com/Whonix/derivative-maker.git"
+VERSION_NUMBER="${VERSION%%-*}"
+REPOSITORY_URL="https://github.com/Whonix/derivative-maker.git"
 FLAVOR_GATEWAY="whonix-gateway-xfce"
 FLAVOR_WORKSTATION="whonix-workstation-xfce"
 TARGET="utm"
@@ -31,26 +32,26 @@ SIZE_WORKSTATION="25G"
 # Functions
 function cleanup() {
   # clean up setup
-  rm -rf "$HOME"/derivative-maker
-  rm -rf "$HOME"/derivative-binary
-  rm -rf "$HOME"/whonix-binary
-  rm -rf "$HOME"/build-log
-  touch "$HOME"/build-log
+  rm -rf "$HOME"/"$WB"
+  rm -rf "$HOME"/"$BL"
+  touch "$HOME"/"$BL"
 }
 
-function update_install() {
+function update() {
   # updates/upgrades and autoremove packages
-  echo "Starting $NAME build for version $VERSION" 
   sudo apt update -y
   sudo apt upgrade -y
   sudo apt autoremove -y
+}
+
+function install() {
   # install dependencies
   local PACKAGES=("git" "time" "curl" "apt-cacher-ng" "lsb-release" "fakeroot" "fasttrack-archive-keyring")
   # Loop through each package
   for PACKAGE in "${PACKAGES[@]}"; do
       if ! dpkg -l "$PACKAGE" &> /dev/null; then
           echo "$PACKAGE is not installed. Installing..."
-          sudo apt install -y "$PACKAGE" 2>&1 | tee -a ~/build-log
+          sudo apt install -y "$PACKAGE"
       else
           echo "$PACKAGE is already installed."
       fi
@@ -60,7 +61,7 @@ function update_install() {
 function repo_down() {
   # download git repository
   echo "Git clone $NAME version $VERSION"
-  git clone --depth=1 --branch "$VERSION" --jobs=4 --recurse-submodules --shallow-submodules $WHONIX_REPOSITORY
+  git clone --depth=1 --branch "$VERSION" --jobs=4 --recurse-submodules --shallow-submodules $REPOSITORY_URL
   cd "$HOME"/derivative-maker
 
   # verifies correct version is downloaded
@@ -73,7 +74,7 @@ function repo_down() {
   fi
 }
 
-function verify_tag() {
+function verify_branch() {
   # verifies git tag with gpg keyring
   cd "$HOME"/"$DM"
 
@@ -92,7 +93,6 @@ function verify_tag() {
   fi
 }
 
-
 function build() {
   # build the project
   cd "$HOME"/"$DM"
@@ -108,8 +108,20 @@ function pack() {
   # cp binary tar.gz files into another directory for easy access
   mkdir "$HOME"/"$WB"
   cp -vr "$HOME"/"$DB"/"$VERSION_NUMBER"/*.utm.tar.gz "$HOME"/"$WB"
-  echo "Build of $NAME version $WHONIX_VERSION is finished"
+  echo "Build of $NAME version $VERSION is finished"
 }
+
+function main() {
+  echo "Starting $NAME build for version $VERSION" 
+  update
+  install
+  if [ ! -f "$HOME"/"$DM" ]; then
+    repo_down
+  fi
+  verify_branch
+  build
+  pack
+} 
 
 # starts scripts
 echo "Starting $NAME build function"
@@ -117,13 +129,7 @@ cd "$HOME"
 cleanup
 
 # everything from here on will be included in build-log
-update_install 2>&1 | tee -a ~/build-log
-if [ ! -f "$HOME"/"$DM" ]; then
-  repo_down 2>&1 | tee -a ~/build-log
-fi
-verify_tag 2>&1 | tee -a ~/build-log
-build 2>&1 | tee -a ~/build-log
-pack 2>&1 | tee -a ~/build-log
+main 2>&1 | tee -a "$HOME"/"$BL"
 
 # cp build log to whonix folder and completing the script
 cp "$HOME"/build-log "$HOME"/"$WB"/
