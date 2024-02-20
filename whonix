@@ -79,17 +79,17 @@ function verify_branch() {
   cd "$HOME"/"$DM"
 
   # Verify if the current directory is a git repository
-  if git rev-parse --git-dir > /dev/null 2>&1; then
-    if git verify-tag "$WHONIX_VERSION"; then
-      echo "Commit verification succeeded."
-    else
-      echo "Commit verification failed."
-      # Handle the failure case, e.g., exit the script or perform some recovery actions
-      exit 4
-    fi
-  else
+  if ! git rev-parse --git-dir > /dev/null 2>&1; then
     echo "Not a git repository. Please run this script within a git repository."
     exit 3
+  fi
+
+  if git verify-tag "$VERSION"; then
+    echo "Commit verification succeeded."
+  else
+    echo "Commit verification failed."
+    # Handle the failure case, e.g., exit the script or perform some recovery actions
+    exit 4
   fi
 }
 
