@@ -1,117 +1,175 @@
 #!/bin/bash
 
+# do not run this as root
+if [ "$(id -u)" = "0" ]; then
+   error "Do not run this as root!"
+fi
+
 # check if argument is not missing
 if [ -z "$1" ]; then
-	echo "Error: Missing whonix version. Please provide an whonix version."
+	echo "Error: Missing tag argument. Please provide an tag argument."
 	exit 1
 fi
 
+# variables and configuration
+NAME="whonix"
+DM="derivative-maker"
+DB="derivative-binary"
+BL="build-log"
+VERSION="$1"
+VERSION_MASTER="master"
+VERSION_NUMBER="${VERSION%%-*}"
+REPOSITORY_EXIST="false"
+REPOSITORY_URL="https://github.com/Whonix/derivative-maker.git"
+FLAVOR_GATEWAY="whonix-gateway-xfce"
+FLAVOR_WORKSTATION="whonix-workstation-xfce"
+TARGET="utm"
+ARCH="arm64"
+TB="open"
+REPO="true"
+SIZE_GATEWAY="15G"
+SIZE_WORKSTATION="25G"
+WB="whonix-binary-$VERSION"
+
+# check if the repository is in the home folder
+if [ -f "$HOME"/"$DM" ]; then
+  REPOSITORY_EXIST="true"
+fi
+
 # set options
-set -o nounset
 set -e
+set -o errexit
+set -o nounset
+set -o errtrace
+set -o pipefail
 set -x
 
-# variables
-WHONIX_VERSION="$1"
-VERSION_NUMBER="${WHONIX_VERSION%%-*}"
+# set up trap
+trap 'catch $? $LINENO' EXIT
 
 # Functions
-function cleanup() {
-  # clean up setup
-  rm -rf "$HOME"/derivative-maker
-  rm -rf "$HOME"/derivative-binary
-  rm -rf "$HOME"/whonix-binary
-  rm -rf "$HOME"/build-log
-  touch "$HOME"/build-log
+catch() {
+  echo "Error Report"
+  if [ "$1" != "0" ]; then
+    # error handling goes here
+    echo "Error $1 occurred on line $2"
+  fi
 }
 
-function update_install() {
+function update() {
   # updates/upgrades and autoremove packages
-  echo "Starting whonix build for version $WHONIX_VERSION" 
   sudo apt update -y
   sudo apt upgrade -y
   sudo apt autoremove -y
+}
+
+function install() {
   # install dependencies
-  local packages=("git" "time" "curl" "apt-cacher-ng" "lsb-release" "fakeroot" "fasttrack-archive-keyring")
+  local PACKAGES=("git" "time" "curl" "apt-cacher-ng" "lsb-release" "fakeroot" "fasttrack-archive-keyring")
   # Loop through each package
-  for package in "${packages[@]}"; do
-      if ! dpkg -l "$package" &> /dev/null; then
-          echo "$package is not installed. Installing..."
-          sudo apt install -y "$package" 2>&1 | tee -a ~/build-log
+  for PACKAGE in "${PACKAGES[@]}"; do
+      if ! dpkg -l "$PACKAGE" &> /dev/null; then
+          echo "$PACKAGE is not installed. Installing..."
+          sudo apt install -y "$PACKAGE"
       else
-          echo "$package is already installed."
+          echo "$PACKAGE is already installed."
       fi
   done
 }
 
 function repo_down() {
   # download git repository
-  echo "Git clone whonix version $WHONIX_VERSION"
-  git clone --depth=1 --branch "$WHONIX_VERSION" --jobs=4 --recurse-submodules --shallow-submodules https://github.com/Whonix/derivative-maker.git
+  echo "Git clone $NAME repository"
+  git clone --depth=1 --branch "$VERSION_MASTER" --jobs=4 --recurse-submodules --shallow-submodules $REPOSITORY_URL
   cd "$HOME"/derivative-maker
+
+}
+
+function fetch_tag() {
+  # verifies git tag with gpg keyring
+  cd "$HOME"/"$DM"
+
+  # Verify if the current directory is a git repository
+  if ! git rev-parse --git-dir > /dev/null 2>&1; then
+    echo "Not a git repository. Please run this script within a git repository."
+    exit 2
+  fi
+
+  if [ ! "$(git status --porcelain)" = "" ]; then
+   error "Command git status --porcelain failed at the beginning!"
+  fi
+
+  git fetch origin tag "$VERSION"
+
+  git checkout "$VERSION"
+  
+  git verify-tag "$VERSION"
+  
+  git verify-commit "${VERSION}^{commit}"
+
+  git verify-commit HEAD
+  
+  git submodule sync --recursive >/dev/null
+  
+  git submodule update --init --recursive --jobs=200 >/dev/null
+  
+  if [ ! "$(git status --porcelain)" = "" ]; then
+     error "Command git status --porcelain failed at the end!"
+  fi
 
   # verifies correct version is downloaded
   GIT_VERSION="$(git describe --tags --abbrev=0)"
-  if [ "$GIT_VERSION" == "$WHONIX_VERSION" ]; then
-    echo "Git version matches the desired version ($WHONIX_VERSION)."
+  if [ "$GIT_VERSION" == "$VERSION" ]; then
+    git describe
+    echo "Git version matches the desired version ($VERSION)."
   else
-    echo "Git version does not match the desired version ($WHONIX_VERSION)."
-    exit 2
-  fi
-}
-
-function verify_tag() {
-  # verifies git tag with gpg keyring
-  cd "$HOME"/derivative-maker
-
-  # Verify if the current directory is a git repository
-  if git rev-parse --git-dir > /dev/null 2>&1; then
-    if git verify-tag "$WHONIX_VERSION"; then
-      echo "Commit verification succeeded."
-    else
-      echo "Commit verification failed."
-      # Handle the failure case, e.g., exit the script or perform some recovery actions
-      exit 4
-    fi
-  else
-    echo "Not a git repository. Please run this script within a git repository."
+    git describe
+    echo "Git version does not match the desired version ($VERSION)."
     exit 3
   fi
 }
 
-
-function build_whonix() {
+function build() {
   # build the project
-  cd "$HOME"/derivative-maker
+  cd "$HOME"/"$DM"
 
   echo "Building gateway"
-  ~/derivative-maker/derivative-maker --flavor whonix-gateway-xfce --target utm --arch arm64 --tb open --repo true --vmsize 15G
+  "$HOME"/"$DM"/"$DM" --flavor "$FLAVOR_GATEWAY" --target "$TARGET" --arch "$ARCH" --tb "$TB" --repo "$REPO" --vmsize "$SIZE_GATEWAY"
   
   echo "Building workstation"
-  ~/derivative-maker/derivative-maker --flavor whonix-workstation-xfce --target utm --arch arm64 --tb open --repo true --vmsize 25G
+  "$HOME"/"$DM"/"$DM" --flavor "$FLAVOR_WORKSTATION" --target "$TARGET" --arch "$ARCH" --tb "$TB" --repo "$REPO" --vmsize "$SIZE_WORKSTATION"
 }
 
-function pack_whonix() {
+function pack() {
   # cp binary tar.gz files into another directory for easy access
-  mkdir "$HOME"/whonix-binary
-  cp -vr "$HOME"/derivative-binary/"$VERSION_NUMBER"/*.utm.tar.gz "$HOME"/whonix-binary
-  echo "Build of whonix version $WHONIX_VERSION is finished"
+  mkdir "$HOME"/"$WB"
+  cp -vr "$HOME"/"$DB"/"$VERSION_NUMBER"/*.utm.tar.gz "$HOME"/"$WB"
+  echo "Build of $NAME version $VERSION is finished"
 }
+
+function main() {
+  echo "Starting $NAME build for version $VERSION" 
+  update
+  install
+  if [ "REPOSITORY_EXIST" == "false" ]; then
+    repo_down
+  fi
+  fetch_tag
+  build
+  pack
+} 
 
 # starts scripts
-echo "Starting whonix build function"
+echo "Starting $NAME build function"
 cd "$HOME"
-cleanup
 
 # everything from here on will be included in build-log
-update_install 2>&1 | tee -a ~/build-log
-repo_down 2>&1 | tee -a ~/build-log
-verify_tag 2>&1 | tee -a ~/build-log
-build_whonix 2>&1 | tee -a ~/build-log
-pack_whonix 2>&1 | tee -a ~/build-log
+main 2>&1 | tee -a "$HOME"/"$BL"
 
-# cp build log to whonix folder and completing the script
-cp "$HOME"/build-log "$HOME"/whonix-binary/
+# cp build log to binary easy access folder and completing the script
+mv "$HOME"/build-log "$HOME"/"$WB"/
 echo "Build function finished, please check log"
 cd "$HOME"
+echo "Its recommended that you verify the signing key on the repository and build, more info here:"
+echo "https://www.whonix.org/wiki/Signing_Key"
 exit 0
