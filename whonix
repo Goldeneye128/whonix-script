@@ -11,6 +11,14 @@ if [ -z "$1" ]; then
 	exit 1
 fi
 
+# set options
+set -e
+set -o errexit
+set -o nounset
+set -o errtrace
+set -o pipefail
+set -x
+
 # variables and configuration
 NAME="whonix"
 DM="derivative-maker"
@@ -32,23 +40,15 @@ SIZE_WORKSTATION="25G"
 WB="whonix-binary-$VERSION"
 
 # check if the repository is in the home folder
-if [ -f "$HOME"/"$DM" ]; then
+if [ -d "$HOME"/"$DM" ]; then
   REPOSITORY_EXIST="true"
 fi
-
-# set options
-set -e
-set -o errexit
-set -o nounset
-set -o errtrace
-set -o pipefail
-set -x
 
 # set up trap
 trap 'catch $? $LINENO' EXIT
 
 # Functions
-catch() {
+function catch() {
   echo "Error Report"
   if [ "$1" != "0" ]; then
     # error handling goes here
