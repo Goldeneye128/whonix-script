@@ -1,8 +1,13 @@
 #!/bin/bash
 
+# do not run this as root
+if [ "$(id -u)" = "0" ]; then
+   error "Do not run this as root!"
+fi
+
 # check if argument is not missing
 if [ -z "$1" ]; then
-	echo "Error: Missing whonix version. Please provide an whonix version."
+	echo "Error: Missing tag argument. Please provide an tag argument."
 	exit 1
 fi
 
@@ -18,6 +23,7 @@ DB="derivative-binary"
 WB="whonix-binary"
 BL="build-log"
 VERSION="$1"
+VERSION_MASTER="master"
 VERSION_NUMBER="${VERSION%%-*}"
 REPOSITORY_URL="https://github.com/Whonix/derivative-maker.git"
 FLAVOR_GATEWAY="whonix-gateway-xfce"
@@ -60,36 +66,53 @@ function install() {
 
 function repo_down() {
   # download git repository
-  echo "Git clone $NAME version $VERSION"
-  git clone --depth=1 --branch "$VERSION" --jobs=4 --recurse-submodules --shallow-submodules $REPOSITORY_URL
+  echo "Git clone $NAME repository"
+  git clone --depth=1 --branch "$VERSION_MASTER" --jobs=4 --recurse-submodules --shallow-submodules $REPOSITORY_URL
   cd "$HOME"/derivative-maker
 
-  # verifies correct version is downloaded
-  GIT_VERSION="$(git describe --tags --abbrev=0)"
-  if [ "$GIT_VERSION" == "$VERSION" ]; then
-    echo "Git version matches the desired version ($VERSION)."
-  else
-    echo "Git version does not match the desired version ($VERSION)."
-    exit 2
-  fi
 }
 
-function verify_branch() {
+function fetch_tag() {
   # verifies git tag with gpg keyring
   cd "$HOME"/"$DM"
 
   # Verify if the current directory is a git repository
   if ! git rev-parse --git-dir > /dev/null 2>&1; then
     echo "Not a git repository. Please run this script within a git repository."
-    exit 3
+    exit 2
   fi
 
-  if git verify-tag "$VERSION"; then
-    echo "Commit verification succeeded."
+  if [ ! "$(git status --porcelain)" = "" ]; then
+   error "Command git status --porcelain failed at the beginning!"
+  fi
+
+  git fetch --depth=1 origin tag "$VERSION"
+
+  git checkout --recurse-submodules "$VERSION"
+  
+  git verify-tag "$VERSION"
+  
+  git verify-commit "${VERSION}^{commit}"
+
+  git verify-commit HEAD
+  
+  git submodule sync --recursive >/dev/null
+  
+  git submodule update --init --recursive --jobs=200 >/dev/null
+  
+  if [ ! "$(git status --porcelain)" = "" ]; then
+     error "Command git status --porcelain failed at the end!"
+  fi
+
+  # verifies correct version is downloaded
+  GIT_VERSION="$(git describe --tags --abbrev=0)"
+  if [ "$GIT_VERSION" == "$VERSION" ]; then
+    git describe
+    echo "Git version matches the desired version ($VERSION)."
   else
-    echo "Commit verification failed."
-    # Handle the failure case, e.g., exit the script or perform some recovery actions
-    exit 4
+    git describe
+    echo "Git version does not match the desired version ($VERSION)."
+    exit 3
   fi
 }
 
@@ -118,7 +141,7 @@ function main() {
   if [ ! -f "$HOME"/"$DM" ]; then
     repo_down
   fi
-  verify_branch
+  fetch_tag
   build
   pack
 } 
@@ -131,7 +154,7 @@ cleanup
 # everything from here on will be included in build-log
 main 2>&1 | tee -a "$HOME"/"$BL"
 
-# cp build log to whonix folder and completing the script
+# cp build log to binary easy access folder and completing the script
 cp "$HOME"/build-log "$HOME"/"$WB"/
 echo "Build function finished, please check log"
 cd "$HOME"
