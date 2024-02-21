@@ -91,7 +91,7 @@ function fetch_tag() {
    error "Command git status --porcelain failed at the beginning!"
   fi
 
-  git fetch --depth=1 --recurse-submodules --shallow-submodules --jobs=4 origin tag "$VERSION"
+  git fetch --depth=1 --recurse-submodules --jobs=4 origin tag "$VERSION"
 
   git checkout --recurse-submodules "$VERSION"
   
