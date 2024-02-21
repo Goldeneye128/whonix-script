@@ -7,7 +7,6 @@ This script simplifies the process of building Whonix on Mac computers with Appl
 ### Prerequisites
 
 - Ensure you have a Debian 12 VM set up on your system. The VM should have a user account with sudo privileges and configured for passwordless sudo access.
-- Manually add the GPG keys from Whonix following the instructions provided on their official website. This step is crucial for verifying the integrity of the Whonix source code.
 - While it's not mandatory to install additional dependencies, it is highly recommended to use `tmux` or `screen`, especially when running the script over SSH. These tools help maintain your session and build progress in case of network disruptions.
 
 ### Setup
