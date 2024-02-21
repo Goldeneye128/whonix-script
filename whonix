@@ -93,7 +93,7 @@ function fetch_tag() {
 
   git fetch origin tag "$VERSION"
 
-  git checkout --recurse-submodules "$VERSION"
+  git checkout "$VERSION"
   
   git verify-tag "$VERSION"
   
