@@ -40,7 +40,7 @@ SIZE_WORKSTATION="25G"
 WB="whonix-binary-$VERSION"
 
 # check if the repository is in the home folder
-if [ -f "$HOME"/"$DM" ]; then
+if [ -d "$HOME"/"$DM" ]; then
   REPOSITORY_EXIST="true"
 fi
 
