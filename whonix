@@ -151,7 +151,7 @@ function main() {
   echo "Starting $NAME build for version $VERSION" 
   update
   install
-  if [ "REPOSITORY_EXIST" == "false" ]; then
+  if [ "$REPOSITORY_EXIST" == "false" ]; then
     repo_down
   fi
   fetch_tag
