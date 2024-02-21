@@ -1,10 +1,20 @@
 #!/bin/bash
 
+# do not run this as root
+if [ "$(id -u)" = "0" ]; then
+   error "Do not run this as root!"
+fi
+
+# check if argument is not missing
+if [ -z "$1" ]; then
+	echo "Error: Missing tag argument. Please provide an tag argument."
+	exit 1
+fi
+
 # variables and configuration
 NAME="whonix"
 DM="derivative-maker"
 DB="derivative-binary"
-WB="whonix-binary"
 BL="build-log"
 VERSION="$1"
 VERSION_MASTER="master"
@@ -19,33 +29,31 @@ TB="open"
 REPO="true"
 SIZE_GATEWAY="15G"
 SIZE_WORKSTATION="25G"
+WB="whonix-binary-$VERSION"
 
-# do not run this as root
-if [ "$(id -u)" = "0" ]; then
-   error "Do not run this as root!"
-fi
-
-# check if argument is not missing
-if [ -z "$1" ]; then
-	echo "Error: Missing tag argument. Please provide an tag argument."
-	exit 1
-fi
-
+# check if the repository is in the home folder
 if [ -f "$HOME"/"$DM" ]; then
   REPOSITORY_EXIST="true"
 fi
 
 # set options
-set -o nounset
 set -e
+set -o errexit
+set -o nounset
+set -o errtrace
+set -o pipefail
 set -x
 
+# set up trap
+trap 'catch $? $LINENO' EXIT
+
 # Functions
-function cleanup() {
-  # clean up setup
-  rm -rf "$HOME"/"$WB"
-  rm -rf "$HOME"/"$BL"
-  touch "$HOME"/"$BL"
+catch() {
+  echo "Error Report"
+  if [ "$1" != "0" ]; then
+    # error handling goes here
+    echo "Error $1 occurred on line $2"
+  fi
 }
 
 function update() {
@@ -154,13 +162,14 @@ function main() {
 # starts scripts
 echo "Starting $NAME build function"
 cd "$HOME"
-cleanup
 
 # everything from here on will be included in build-log
 main 2>&1 | tee -a "$HOME"/"$BL"
 
 # cp build log to binary easy access folder and completing the script
-cp "$HOME"/build-log "$HOME"/"$WB"/
+mv "$HOME"/build-log "$HOME"/"$WB"/
 echo "Build function finished, please check log"
 cd "$HOME"
+echo "Its recommended that you verify the signing key on the repository and build, more info here:"
+echo "https://www.whonix.org/wiki/Signing_Key"
 exit 0
