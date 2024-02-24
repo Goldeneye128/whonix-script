@@ -13,11 +13,9 @@ fi
 
 # set options
 set -e
-set -o errexit
 set -o nounset
 set -o errtrace
 set -o pipefail
-set -x
 
 # variables and configuration
 NAME="whonix"
@@ -38,29 +36,75 @@ REPO="true"
 SIZE_GATEWAY="15G"
 SIZE_WORKSTATION="25G"
 WB="whonix-binary-$VERSION"
+APT="/usr/bin/apt"
+GIT="/usr/bin/git"
 
 # check if the repository is in the home folder
 if [ -d "$HOME"/"$DM" ]; then
   REPOSITORY_EXIST="true"
 fi
 
-# set up trap
-trap 'catch $? $LINENO' EXIT
-
-# Functions
+# catching errors as they occurre
 function catch() {
   echo "Error Report"
   if [ "$1" != "0" ]; then
-    # error handling goes here
-    echo "Error $1 occurred on line $2"
+    echo "Error $1 occurred on line $2, command: '$3'"
+    # Additional error handling can go here
   fi
 }
 
+# SIGINIT or SIGTERM
+function handle_signal() {
+    echo "Error: received SIGINIT or SIGTERM exiting"
+    exit 2
+}
+
+# start text
+function beginning() {
+  echo "Starting $NAME build for version $VERSION" 
+}
+
+# finishing text
+function bye() {
+  echo "Exiting without errors."
+  echo "Build function finished, please check log"
+  echo "Its recommended that you verify the signing key on the repository and build, more info here:"
+  echo "https://www.whonix.org/wiki/Signing_Key"
+}
+
+# safe exit of the script
+function safe_exit() {
+  trap bye EXIT
+  exit 0
+}
+
+function check_apt_sources() {
+    echo "Checking APT sources availability..."
+    if ! sudo "$APT" update &> /dev/null; then
+        echo "Error: APT sources are not reachable. Please check your sources.list and internet connection."
+        exit 3
+    fi
+}
+
+function check_connectivity() {
+    local HOST="github.com"
+    echo "Checking connectivity to $HOST..."
+    if ! ping -c 1 -W 2 "$HOST" &> /dev/null; then
+        echo "Error: Unable to reach $HOST. Please check your internet connection."
+        exit 4
+    fi
+}
+
+# Set up trap
+trap 'catch $? $LINENO "$BASH_COMMAND"' EXIT
+trap handle_signal SIGINT SIGTERM
+
 function update() {
   # updates/upgrades and autoremove packages
-  sudo apt update -y
-  sudo apt upgrade -y
-  sudo apt autoremove -y
+  check_apt_sources
+  sudo "$APT" update -y
+  sudo "$APT" upgrade -y
+  sudo "$APT" autoremove -y
 }
 
 function install() {
@@ -70,7 +114,7 @@ function install() {
   for PACKAGE in "${PACKAGES[@]}"; do
       if ! dpkg -l "$PACKAGE" &> /dev/null; then
           echo "$PACKAGE is not installed. Installing..."
-          sudo apt install -y "$PACKAGE"
+          sudo "$APT" install -y "$PACKAGE"
       else
           echo "$PACKAGE is already installed."
       fi
@@ -78,11 +122,13 @@ function install() {
 }
 
 function repo_down() {
-  # download git repository
-  echo "Git clone $NAME repository"
-  git clone --depth=1 --branch "$VERSION_MASTER" --jobs=4 --recurse-submodules --shallow-submodules $REPOSITORY_URL
-  cd "$HOME"/derivative-maker
-
+  if [ "$REPOSITORY_EXIST" == "false" ]; then
+    # download git repository
+    check_connectivity
+    echo "Git clone $NAME repository"
+    "$GIT" clone --depth=1 --branch "$VERSION_MASTER" --jobs=4 --recurse-submodules --shallow-submodules "$REPOSITORY_URL"
+    cd "$HOME"/"$DM"
+  fi
 }
 
 function fetch_tag() {
@@ -90,41 +136,41 @@ function fetch_tag() {
   cd "$HOME"/"$DM"
 
   # Verify if the current directory is a git repository
-  if ! git rev-parse --git-dir > /dev/null 2>&1; then
-    echo "Not a git repository. Please run this script within a git repository."
+  if ! "$Git" rev-parse --git-dir > /dev/null 2>&1; then
+    echo "Error: Not a git repository. Please run this script within a git repository."
     exit 2
   fi
 
-  if [ ! "$(git status --porcelain)" = "" ]; then
+  if [ ! "$($GIT status --porcelain)" = "" ]; then
    error "Command git status --porcelain failed at the beginning!"
   fi
 
-  git fetch origin tag "$VERSION"
+  "$GIT" fetch origin tag "$VERSION"
 
-  git checkout "$VERSION"
-  
-  git verify-tag "$VERSION"
-  
-  git verify-commit "${VERSION}^{commit}"
+  "$GIT" checkout "$VERSION"
 
-  git verify-commit HEAD
+  "$GIT" verify-tag "$VERSION"
+
+  "$GIT" verify-commit "${VERSION}^{commit}"
+
+  "$GIT" verify-commit HEAD
+
+  "$GIT" submodule sync --recursive >/dev/null
+
+  "$GIT" submodule update --init --recursive --jobs=200 >/dev/null
   
-  git submodule sync --recursive >/dev/null
-  
-  git submodule update --init --recursive --jobs=200 >/dev/null
-  
-  if [ ! "$(git status --porcelain)" = "" ]; then
+  if [ ! "$($GIT status --porcelain)" = "" ]; then
      error "Command git status --porcelain failed at the end!"
   fi
 
   # verifies correct version is downloaded
-  GIT_VERSION="$(git describe --tags --abbrev=0)"
+  GIT_VERSION="$($GIT describe --tags --abbrev=0)"
   if [ "$GIT_VERSION" == "$VERSION" ]; then
-    git describe
+    "$GIT" describe
     echo "Git version matches the desired version ($VERSION)."
   else
-    git describe
-    echo "Git version does not match the desired version ($VERSION)."
+    "$GIT" describe
+    echo "Error: Git version does not match the desired version ($VERSION)."
     exit 3
   fi
 }
@@ -148,12 +194,10 @@ function pack() {
 }
 
 function main() {
-  echo "Starting $NAME build for version $VERSION" 
+  beginning
   update
   install
-  if [ "$REPOSITORY_EXIST" == "false" ]; then
-    repo_down
-  fi
+  repo_down
   fetch_tag
   build
   pack
@@ -168,8 +212,7 @@ main 2>&1 | tee -a "$HOME"/"$BL"
 
 # cp build log to binary easy access folder and completing the script
 mv "$HOME"/build-log "$HOME"/"$WB"/
-echo "Build function finished, please check log"
 cd "$HOME"
-echo "Its recommended that you verify the signing key on the repository and build, more info here:"
-echo "https://www.whonix.org/wiki/Signing_Key"
-exit 0
+
+# exit the script
+safe_exit
