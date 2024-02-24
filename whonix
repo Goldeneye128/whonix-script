@@ -2,13 +2,14 @@
 
 # do not run this as root
 if [ "$(id -u)" = "0" ]; then
-   error "Do not run this as root!"
+   echo "Error: Do not run this as root!"
+   exit 1
 fi
 
 # check if argument is not missing
 if [ -z "$1" ]; then
 	echo "Error: Missing tag argument. Please provide an tag argument."
-	exit 1
+	exit 2
 fi
 
 # set options
@@ -25,7 +26,6 @@ BL="build-log"
 VERSION="$1"
 VERSION_MASTER="master"
 VERSION_NUMBER="${VERSION%%-*}"
-REPOSITORY_EXIST="false"
 REPOSITORY_URL="https://github.com/Whonix/derivative-maker.git"
 FLAVOR_GATEWAY="whonix-gateway-xfce"
 FLAVOR_WORKSTATION="whonix-workstation-xfce"
@@ -39,11 +39,6 @@ WB="whonix-binary-$VERSION"
 APT="/usr/bin/apt"
 GIT="/usr/bin/git"
 
-# check if the repository is in the home folder
-if [ -d "$HOME"/"$DM" ]; then
-  REPOSITORY_EXIST="true"
-fi
-
 # catching errors as they occurre
 function catch() {
   echo "Error Report"
@@ -53,10 +48,10 @@ function catch() {
   fi
 }
 
-# SIGINIT or SIGTERM
+# SIGINT or SIGTERM
 function handle_signal() {
-    echo "Error: received SIGINIT or SIGTERM exiting"
-    exit 2
+  echo "Error: received SIGINT or SIGTERM exiting"
+  exit 3
 }
 
 # start text
@@ -79,20 +74,25 @@ function safe_exit() {
 }
 
 function check_apt_sources() {
-    echo "Checking APT sources availability..."
-    if ! sudo "$APT" update &> /dev/null; then
-        echo "Error: APT sources are not reachable. Please check your sources.list and internet connection."
-        exit 3
-    fi
+  echo "Checking APT sources availability..."
+  if ! sudo "$APT" update &> /dev/null; then
+      echo "Error: APT sources are not reachable. Please check your sources.list and internet connection."
+      exit 4
+  fi
 }
 
 function check_connectivity() {
-    local HOST="github.com"
-    echo "Checking connectivity to $HOST..."
-    if ! ping -c 1 -W 2 "$HOST" &> /dev/null; then
-        echo "Error: Unable to reach $HOST. Please check your internet connection."
-        exit 4
-    fi
+  local HOST="github.com"
+  echo "Checking connectivity to $HOST..."
+  if ! ping -c 1 -W 2 "$HOST" &> /dev/null; then
+      echo "Error: Unable to reach $HOST. Please check your internet connection."
+      exit 5
+  fi
+}
+
+function repository_not_found() {
+  echo "Error: $HOME/$DM not found"
+  exit 6
 }
 
 # Set up trap
@@ -122,27 +122,28 @@ function install() {
 }
 
 function repo_down() {
-  if [ "$REPOSITORY_EXIST" == "false" ]; then
+  if [ ! -d "$HOME"/"$DM" ]; then
     # download git repository
     check_connectivity
     echo "Git clone $NAME repository"
     "$GIT" clone --depth=1 --branch "$VERSION_MASTER" --jobs=4 --recurse-submodules --shallow-submodules "$REPOSITORY_URL"
-    cd "$HOME"/"$DM"
+    cd "$HOME"/"$DM" || repository_not_found
   fi
 }
 
 function fetch_tag() {
   # verifies git tag with gpg keyring
-  cd "$HOME"/"$DM"
+  cd "$HOME"/"$DM" || repository_not_found
 
   # Verify if the current directory is a git repository
-  if ! "$Git" rev-parse --git-dir > /dev/null 2>&1; then
+  if ! "$GIT" rev-parse --git-dir > /dev/null 2>&1; then
     echo "Error: Not a git repository. Please run this script within a git repository."
-    exit 2
+    exit 7
   fi
 
   if [ ! "$($GIT status --porcelain)" = "" ]; then
-   error "Command git status --porcelain failed at the beginning!"
+   echo "Error: Command git status --porcelain failed at the beginning!"
+   exit 8
   fi
 
   "$GIT" fetch origin tag "$VERSION"
@@ -160,7 +161,8 @@ function fetch_tag() {
   "$GIT" submodule update --init --recursive --jobs=200 >/dev/null
   
   if [ ! "$($GIT status --porcelain)" = "" ]; then
-     error "Command git status --porcelain failed at the end!"
+     echo "Error: Command git status --porcelain failed at the end!"
+     exit 9
   fi
 
   # verifies correct version is downloaded
@@ -171,13 +173,13 @@ function fetch_tag() {
   else
     "$GIT" describe
     echo "Error: Git version does not match the desired version ($VERSION)."
-    exit 3
+    exit 10
   fi
 }
 
 function build() {
   # build the project
-  cd "$HOME"/"$DM"
+  cd "$HOME"/"$DM" || repository_not_found
 
   echo "Building gateway"
   "$HOME"/"$DM"/"$DM" --flavor "$FLAVOR_GATEWAY" --target "$TARGET" --arch "$ARCH" --tb "$TB" --repo "$REPO" --vmsize "$SIZE_GATEWAY"
@@ -211,7 +213,7 @@ cd "$HOME"
 main 2>&1 | tee -a "$HOME"/"$BL"
 
 # cp build log to binary easy access folder and completing the script
-mv "$HOME"/build-log "$HOME"/"$WB"/
+mv "$HOME"/"$BL" "$HOME"/"$WB"/
 cd "$HOME"
 
 # exit the script
