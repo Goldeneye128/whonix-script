@@ -2,14 +2,14 @@
 
 # do not run this as root
 if [ "$(id -u)" = "0" ]; then
-   echo "Error: Do not run this as root!"
-   exit 1
+  echo "Error: Do not run this as root!"
+  exit 1
 fi
 
 # check if argument is not missing
 if [ -z "$1" ]; then
-	echo "Error: Missing tag argument. Please provide an tag argument."
-	exit 2
+  echo "Error: Missing tag argument. Please provide a tag argument."
+  exit 2
 fi
 
 # set options
@@ -39,12 +39,12 @@ WB="whonix-binary-$VERSION"
 APT="/usr/bin/apt"
 GIT="/usr/bin/git"
 
-# catching errors as they occurre
+# catching errors as they occur
 function catch() {
   echo "Error Report"
   if [ "$1" != "0" ]; then
     echo "Error $1 occurred on line $2, command: '$3'"
-    # Additional error handling can go here
+    exit 11  # Exit on any error caught by this function
   fi
 }
 
@@ -56,7 +56,7 @@ function handle_signal() {
 
 # start text
 function beginning() {
-  echo "Starting $NAME build for version $VERSION" 
+  echo "Starting $NAME build for version $VERSION"
 }
 
 # finishing text
@@ -76,8 +76,8 @@ function safe_exit() {
 function check_apt_sources() {
   echo "Checking APT sources availability..."
   if ! sudo "$APT" update &> /dev/null; then
-      echo "Error: APT sources are not reachable. Please check your sources.list and internet connection."
-      exit 4
+    echo "Error: APT sources are not reachable. Please check your sources.list and internet connection."
+    exit 4
   fi
 }
 
@@ -85,13 +85,13 @@ function check_connectivity() {
   local HOST="github.com"
   echo "Checking connectivity to $HOST..."
   if ! ping -c 1 -W 2 "$HOST" &> /dev/null; then
-      echo "Error: Unable to reach $HOST. Please check your internet connection."
-      exit 5
+    echo "Error: Unable to reach $HOST. Please check your internet connection."
+    exit 5
   fi
 }
 
 function repository_not_found() {
-  echo "Error: $HOME/$DM not found"
+  echo "Error: ${HOME}/${DM} not found"
   exit 6
 }
 
@@ -112,28 +112,27 @@ function install() {
   local PACKAGES=("git" "time" "curl" "apt-cacher-ng" "lsb-release" "fakeroot" "fasttrack-archive-keyring")
   # Loop through each package
   for PACKAGE in "${PACKAGES[@]}"; do
-      if ! dpkg -l "$PACKAGE" &> /dev/null; then
-          echo "$PACKAGE is not installed. Installing..."
-          sudo "$APT" install -y "$PACKAGE"
-      else
-          echo "$PACKAGE is already installed."
-      fi
+    if ! dpkg -l "$PACKAGE" &> /dev/null; then
+      echo "$PACKAGE is not installed. Installing..."
+      sudo "$APT" install -y "$PACKAGE"
+    else
+      echo "$PACKAGE is already installed."
+    fi
   done
 }
 
 function repo_down() {
-  if [ ! -d "$HOME"/"$DM" ]; then
+  if [ ! -d "${HOME}/${DM}" ]; then
     # download git repository
     check_connectivity
     echo "Git clone $NAME repository"
     "$GIT" clone --depth=1 --branch "$VERSION_MASTER" --jobs=4 --recurse-submodules --shallow-submodules "$REPOSITORY_URL"
-    cd "$HOME"/"$DM" || repository_not_found
+    cd "${HOME}/${DM}" || repository_not_found
   fi
 }
 
 function fetch_tag() {
-  # verifies git tag with gpg keyring
-  cd "$HOME"/"$DM" || repository_not_found
+  cd "${HOME}/${DM}" || repository_not_found
 
   # Verify if the current directory is a git repository
   if ! "$GIT" rev-parse --git-dir > /dev/null 2>&1; then
@@ -142,27 +141,22 @@ function fetch_tag() {
   fi
 
   if [ ! "$($GIT status --porcelain)" = "" ]; then
-   echo "Error: Command git status --porcelain failed at the beginning!"
-   exit 8
+    echo "Error: Command git status --porcelain failed at the beginning!"
+    exit 8
   fi
 
+  # fetch the selected git tag version
   "$GIT" fetch origin tag "$VERSION"
-
   "$GIT" checkout "$VERSION"
-
   "$GIT" verify-tag "$VERSION"
-
   "$GIT" verify-commit "${VERSION}^{commit}"
-
   "$GIT" verify-commit HEAD
-
   "$GIT" submodule sync --recursive >/dev/null
-
   "$GIT" submodule update --init --recursive --jobs=200 >/dev/null
   
   if [ ! "$($GIT status --porcelain)" = "" ]; then
-     echo "Error: Command git status --porcelain failed at the end!"
-     exit 9
+    echo "Error: Command git status --porcelain failed at the end!"
+    exit 9
   fi
 
   # verifies correct version is downloaded
@@ -178,20 +172,18 @@ function fetch_tag() {
 }
 
 function build() {
-  # build the project
-  cd "$HOME"/"$DM" || repository_not_found
+  cd "${HOME}/${DM}" || repository_not_found
 
   echo "Building gateway"
-  "$HOME"/"$DM"/"$DM" --flavor "$FLAVOR_GATEWAY" --target "$TARGET" --arch "$ARCH" --tb "$TB" --repo "$REPO" --vmsize "$SIZE_GATEWAY"
+  "${HOME}/${DM}/${DM}" --flavor "$FLAVOR_GATEWAY" --target "$TARGET" --arch "$ARCH" --tb "$TB" --repo "$REPO" --vmsize "$SIZE_GATEWAY"
   
   echo "Building workstation"
-  "$HOME"/"$DM"/"$DM" --flavor "$FLAVOR_WORKSTATION" --target "$TARGET" --arch "$ARCH" --tb "$TB" --repo "$REPO" --vmsize "$SIZE_WORKSTATION"
+  "${HOME}/${DM}/${DM}" --flavor "$FLAVOR_WORKSTATION" --target "$TARGET" --arch "$ARCH" --tb "$TB" --repo "$REPO" --vmsize "$SIZE_WORKSTATION"
 }
 
 function pack() {
-  # cp binary tar.gz files into another directory for easy access
-  mkdir "$HOME"/"$WB"
-  cp -vr "$HOME"/"$DB"/"$VERSION_NUMBER"/*.utm.tar.gz "$HOME"/"$WB"
+  mkdir -p "${HOME}/${WB}"
+  cp -vr "${HOME}/${DB}/${VERSION_NUMBER}"/*.utm.tar.gz "${HOME}/${WB}"
   echo "Build of $NAME version $VERSION is finished"
 }
 
@@ -205,16 +197,16 @@ function main() {
   pack
 } 
 
-# starts scripts
+# Script execution starts here
 echo "Starting $NAME build function"
-cd "$HOME"
+cd "$HOME" || { echo "Error: Failed to change directory to $HOME"; exit 12; }
 
-# everything from here on will be included in build-log
-main 2>&1 | tee -a "$HOME"/"$BL"
+main 2>&1 | tee -a "${HOME}/${BL}"
 
-# cp build log to binary easy access folder and completing the script
-mv "$HOME"/"$BL" "$HOME"/"$WB"/
-cd "$HOME"
+# Copy the build log to the binary easy access folder and complete the script
+mv "${HOME}/${BL}" "${HOME}/${WB}/" || { echo "Error: Failed to move build log"; exit 13; }
 
-# exit the script
+cd "$HOME" || { echo "Error: Failed to change directory to $HOME at script end"; exit 14; }
+
+# Exit the script safely
 safe_exit

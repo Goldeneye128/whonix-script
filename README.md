@@ -36,6 +36,10 @@ Upon successful completion of the script, the resulting `.tar.gz` archives for b
 
 To transfer the `whonix-binary` folder to your Mac, the `scp` command can be utilized. Once moved, you can extract the contents of both the Workstation and Gateway `.tar.gz` files using the command `tar -xvf` to obtain the UTM-compatible files. Following extraction, these files can be run in UTM to initiate your Whonix instances.
 
+### Optional: Verifying the Signing Key
+
+After running the script, it is a good security practice to verify the signing key of the downloaded Whonix files. Verifying the digital signature ensures that the files have not been tampered with and are indeed from a trusted source. For detailed instructions on how to perform this verification, please refer to [Whonix's Official Signing Key Verification Guide](https://www.whonix.org/wiki/Signing_Key).
+
 ### Questions and Issues
 
 If you have any questions or encounter any issues, please feel free to contact me directly or open an issue on this repository. Your feedback and contributions are welcome, whether they are bug reports or feature requests.
