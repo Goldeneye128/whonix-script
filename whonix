@@ -110,7 +110,7 @@ function update() {
 
 function install() {
   # install dependencies
-  local PACKAGES=("git" "time" "curl" "apt-cacher-ng" "lsb-release" "dpkg-dev" "fakeroot" "fasttrack-archive-keyring" "safe-rm" "sudo apt install --no-install-recommends extrepo-offline-data")
+  local PACKAGES=("git" "time" "curl" "apt-cacher-ng" "lsb-release" "dpkg-dev" "fakeroot" "fasttrack-archive-keyring" "safe-rm" "extrepo-offline-data")
   # Loop through each package
   for PACKAGE in "${PACKAGES[@]}"; do
     if ! dpkg -l "$PACKAGE" &> /dev/null; then
