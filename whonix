@@ -38,6 +38,7 @@ SIZE_WORKSTATION="25G"
 WB="whonix-binary-$VERSION"
 APT="/usr/bin/apt"
 GIT="/usr/bin/git"
+GPG="/usr/bin/gpg"
 
 # catching errors as they occur
 function catch() {
@@ -109,16 +110,17 @@ function update() {
 
 function install() {
   # install dependencies
-  local PACKAGES=("git" "time" "curl" "apt-cacher-ng" "lsb-release" "dpkg-dev" "fakeroot" "fasttrack-archive-keyring" "safe-rm")
+  local PACKAGES=("git" "time" "curl" "apt-cacher-ng" "lsb-release" "dpkg-dev" "fakeroot" "fasttrack-archive-keyring" "safe-rm" "sudo apt install --no-install-recommends extrepo-offline-data")
   # Loop through each package
   for PACKAGE in "${PACKAGES[@]}"; do
     if ! dpkg -l "$PACKAGE" &> /dev/null; then
       echo "$PACKAGE is not installed. Installing..."
-      sudo DEBIAN_FRONTEND=noninteractive "$APT" install -y "$PACKAGE"
+      sudo DEBIAN_FRONTEND=noninteractive "$APT" install --no-install-recommends -y "$PACKAGE"
     else
       echo "$PACKAGE is already installed."
     fi
   done
+  "GPG" --import /usr/share/extrepo/offline-data/debian/bullseye/whonix.asc
 }
 
 function repo_down() {
@@ -145,6 +147,10 @@ function fetch_tag() {
     exit 8
   fi
 
+  # Before fetching and checking out:
+  "$GIT" reset --hard HEAD
+  "$GIT" clean -fdx
+
   # Fetch only the specific tag
   "$GIT" fetch --depth=1 origin tag "$VERSION"
 
@@ -158,6 +164,10 @@ function fetch_tag() {
   "$GIT" submodule sync --recursive >/dev/null
   "$GIT" submodule update --init --recursive --force --remote --jobs=200 >/dev/null
   
+  # Clean and reset submodules as well
+  "$GIT" submodule foreach --recursive 'git reset --hard'
+  "$GIT" submodule foreach --recursive 'git clean -fdx'
+
   if [ ! "$($GIT status --porcelain)" = "" ]; then
     echo "Error: Command git status --porcelain failed at the end!"
     exit 9
