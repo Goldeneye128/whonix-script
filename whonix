@@ -109,12 +109,12 @@ function update() {
 
 function install() {
   # install dependencies
-  local PACKAGES=("git" "time" "curl" "apt-cacher-ng" "lsb-release" "fakeroot" "fasttrack-archive-keyring")
+  local PACKAGES=("git" "time" "curl" "apt-cacher-ng" "lsb-release" "dpkg-dev" "fakeroot" "fasttrack-archive-keyring" "safe-rm")
   # Loop through each package
   for PACKAGE in "${PACKAGES[@]}"; do
     if ! dpkg -l "$PACKAGE" &> /dev/null; then
       echo "$PACKAGE is not installed. Installing..."
-      sudo "$APT" install -y "$PACKAGE"
+      sudo DEBIAN_FRONTEND=noninteractive "$APT" install -y "$PACKAGE"
     else
       echo "$PACKAGE is already installed."
     fi
@@ -152,7 +152,7 @@ function fetch_tag() {
   "$GIT" verify-commit "${VERSION}^{commit}"
   "$GIT" verify-commit HEAD
   "$GIT" submodule sync --recursive >/dev/null
-  "$GIT" submodule update --init --recursive --jobs=200 >/dev/null
+  "$GIT" submodule update --init --recursive --force --remote --jobs=200 >/dev/null
   
   if [ ! "$($GIT status --porcelain)" = "" ]; then
     echo "Error: Command git status --porcelain failed at the end!"
