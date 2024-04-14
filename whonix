@@ -148,7 +148,7 @@ function fetch_tag() {
   fi
 
   # Before fetching and checking out:
-  "$GIT" reset --hard HEAD
+  "$GIT" reset --hard
   "$GIT" clean -fdx
 
   # Fetch only the specific tag
@@ -160,14 +160,16 @@ function fetch_tag() {
   "$GIT" verify-commit "${VERSION}^{commit}"
   "$GIT" verify-commit HEAD
 
+  # Reset and clean each submodule
+  "$GIT" submodule foreach --recursive 'git reset --hard && git clean -fdx'
+
   # Submodule operations
   "$GIT" submodule sync --recursive >/dev/null
   "$GIT" submodule update --init --recursive --force --remote --jobs=200 >/dev/null
-  
-  # Clean and reset submodules as well
-  "$GIT" submodule foreach --recursive 'git reset --hard'
-  "$GIT" submodule foreach --recursive 'git clean -fdx'
 
+  # Double-check everything is clean
+  "$GIT" submodule foreach --recursive 'git reset --hard && git clean -fdx'
+  
   if [ ! "$($GIT status --porcelain)" = "" ]; then
     echo "Error: Command git status --porcelain failed at the end!"
     exit 9
