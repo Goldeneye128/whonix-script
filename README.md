@@ -7,6 +7,7 @@ This script simplifies the process of building Whonix on Mac computers with Appl
 ### Prerequisites
 
 - Ensure you have a Debian 12 VM set up on your system. The VM should have a user account with sudo privileges and configured for passwordless sudo access.
+- **Debian 12 UTM Gallery Image Users**: If you are using the Debian 12 gallery image from UTM, no initial setup for passwordless sudo is required. The script will automatically configure the necessary sudoers file. Simply ensure that your VM has an active internet connection, and you can run the script immediately after a fresh installation.
 - While it's not mandatory to install additional dependencies, it is highly recommended to use `tmux` or `screen`, especially when running the script over SSH. These tools help maintain your session and build progress in case of network disruptions.
 
 ### Setup
