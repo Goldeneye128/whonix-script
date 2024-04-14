@@ -145,12 +145,16 @@ function fetch_tag() {
     exit 8
   fi
 
-  # fetch the selected git tag version
-  "$GIT" fetch origin tag "$VERSION"
+  # Fetch only the specific tag
+  "$GIT" fetch --depth=1 origin tag "$VERSION"
+
+  # Checkout the fetched tag
   "$GIT" checkout "$VERSION"
   "$GIT" verify-tag "$VERSION"
   "$GIT" verify-commit "${VERSION}^{commit}"
   "$GIT" verify-commit HEAD
+
+  # Submodule operations
   "$GIT" submodule sync --recursive >/dev/null
   "$GIT" submodule update --init --recursive --force --remote --jobs=200 >/dev/null
   
