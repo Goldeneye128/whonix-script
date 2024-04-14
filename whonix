@@ -113,14 +113,22 @@ function install() {
   local PACKAGES=("git" "time" "curl" "apt-cacher-ng" "lsb-release" "dpkg-dev" "fakeroot" "fasttrack-archive-keyring" "safe-rm" "extrepo-offline-data")
   # Loop through each package
   for PACKAGE in "${PACKAGES[@]}"; do
-    if ! dpkg -l "$PACKAGE" &> /dev/null; then
+    if ! dpkg-query -W -f='${Status}' "$PACKAGE" 2>/dev/null | grep -q "install ok installed"; then
       echo "$PACKAGE is not installed. Installing..."
-      sudo DEBIAN_FRONTEND=noninteractive "$APT" install --no-install-recommends -y "$PACKAGE"
+      sudo DEBIAN_FRONTEND=noninteractive "$APT" install -y "$PACKAGE"
     else
       echo "$PACKAGE is already installed."
     fi
   done
-  "$GPG" --import /usr/share/extrepo/offline-data/debian/bullseye/whonix.asc
+
+    # GPG Key Import Check
+  local KEY_FINGERPRINT="916B8D99C38EAF5E8ADC7A2A8D66066A2EEACCDA"
+  if ! gpg --list-keys "$KEY_FINGERPRINT" > /dev/null 2>&1; then
+    echo "GPG key not found. Importing..."
+    "$GPG" --import /usr/share/extrepo/offline-data/debian/bullseye/whonix.asc
+  else
+    echo "GPG key already imported."
+  fi
 }
 
 function repo_down() {
@@ -164,9 +172,8 @@ function fetch_tag() {
   "$GIT" submodule foreach --recursive 'git reset --hard && git clean -fdx'
 
   # Submodule operations
-  "$GIT" submodule sync --recursive >/dev/null
-  # "$GIT" submodule update --init --recursive --force --remote --jobs=200 >/dev/null
-  "$GIT" -c merge.verifySignatures=true submodule update --init --recursive --jobs=200 --merge
+  "$GIT" submodule sync --recursive
+  "$GIT" submodule update --init --recursive --jobs=200
 
   # Double-check everything is clean
   "$GIT" submodule foreach --recursive 'git reset --hard && git clean -fdx'
