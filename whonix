@@ -12,6 +12,22 @@ if [ -z "$1" ]; then
   exit 2
 fi
 
+# Check if the 'debian' user exists
+if id "debian" &>/dev/null; then
+    # Check if 'debian' user is in the 'sudo' group
+    if groups "debian" | grep -qw "sudo"; then
+        # Check if the sudoers file already exists
+        if [ ! -f /etc/sudoers.d/debian_nopass ]; then
+            echo "Creating no-password sudo entry for debian user..."
+            # Use echo piped to sudo tee to safely create a sudoers file without using a text editor
+            echo 'debian' | sudo -S sh -c "echo '%sudo ALL=(ALL) NOPASSWD: ALL' | tee /etc/sudoers.d/debian_nopass > /dev/null"
+            # Set correct permissions for the sudoers file
+            echo 'debian' | sudo -S chmod 0440 /etc/sudoers.d/debian_nopass
+            echo "No-password sudo entry created successfully."
+        fi
+    fi
+fi
+
 # set options
 set -e
 set -o nounset
