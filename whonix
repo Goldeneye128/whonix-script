@@ -120,7 +120,7 @@ function install() {
       echo "$PACKAGE is already installed."
     fi
   done
-  "GPG" --import /usr/share/extrepo/offline-data/debian/bullseye/whonix.asc
+  "$GPG" --import /usr/share/extrepo/offline-data/debian/bullseye/whonix.asc
 }
 
 function repo_down() {
